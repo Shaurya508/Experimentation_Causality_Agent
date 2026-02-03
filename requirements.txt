@@ -1,0 +1,10 @@
+beautifulsoup4
+google-generativeai
+faiss-cpu
+numpy
+python-dotenv
+langchain-community
+langchain-google-genai
+langchain-core
+fastapi
+uvicorn[standard]
