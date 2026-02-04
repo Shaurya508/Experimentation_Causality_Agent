@@ -4,9 +4,10 @@ from typing import List, Optional, Generator
 
 import google.generativeai as genai
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel
 
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
@@ -20,6 +21,31 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 FAISS_INDEX_DIR = "faiss_index_merged_updated"
 EMBEDDING_MODEL = "models/gemini-embedding-001"
 GENERATION_MODEL = "gemini-2.5-flash"
+CHATBOT_API_KEY = os.getenv("CHATBOT_API_KEY")
+
+
+# ---------- Auth ----------
+auth_header = APIKeyHeader(name="Authorization", auto_error=False)
+
+
+def verify_token(authorization: str = Depends(auth_header)):
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization header",
+        )
+    if not authorization.startswith("Token "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Authorization header format. Expected: Token <token>",
+        )
+    token = authorization[6:]  # Remove "Token " prefix
+    if token != CHATBOT_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+        )
+    return token
 
 
 # ---------- Models ----------
@@ -155,7 +181,7 @@ app.add_middleware(
 
 
 @app.post("/chat")
-def chat_stream(request: ChatRequest):
+def chat_stream(request: ChatRequest, _: str = Depends(verify_token)):
     """
     Streaming RAG chatbot endpoint using Server-Sent Events.
 
