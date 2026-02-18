@@ -140,6 +140,40 @@ Answer (using only the context above; do not name any sources):
             yield chunk.text
 
 
+def stream_answer_itsa(query: str, context) -> Generator[str, None, None]:
+    """Stream the answer token by token for ITSA experimentation agent."""
+    context_str = "\n\n".join(c["text"] for c in context)
+    system_instruction = (
+        "You are an experimentation agent specialized in Interrupted Time Series Analysis (ITSA). "
+        "Your role is to help users design, run, and interpret experiments using ITSA and related causal inference methods. "
+        "Guide users through experiment setup — choosing test and control markets, defining intervention windows, "
+        "selecting appropriate date ranges, and understanding pre/post intervention trends. "
+        "Explain statistical results such as p-values, coefficients, trend changes, and effect sizes in practical terms. "
+        "Help users determine whether their experiment shows a statistically significant causal impact. "
+        "Answer using the provided context and explain all answers in as much detail as possible. "
+        "Do not cite, name, or mention any sources, filenames, or references in your response. "
+        "Think using the context and answer the questions using your intelligence. "
+        "Just give the answer directly; there is no need to say 'The context says that ...' or 'According to the context'."
+    )
+    prompt = f"""
+Context:
+{context_str}
+
+Question:
+{query}
+
+Answer (using only the context above; do not name any sources):
+"""
+    model = genai.GenerativeModel(
+        GENERATION_MODEL,
+        system_instruction=system_instruction,
+    )
+    response = model.generate_content(prompt, stream=True)
+    for chunk in response:
+        if chunk.text:
+            yield chunk.text
+
+
 def order_sources(context) -> List[str]:
     unique_sources = list({c["source"] for c in context})
     # Aryma Labs Repository first, then the rest
@@ -204,6 +238,40 @@ def chat_stream(request: ChatRequest, _: str = Depends(verify_token)):
         yield f"data: {sources_data}\n\n"
 
         # Signal completion
+        done_data = json.dumps({"type": "done"})
+        yield f"data: {done_data}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@app.post("/chat_ITSA")
+def chat_stream_itsa(request: ChatRequest, _: str = Depends(verify_token)):
+    """
+    Streaming experimentation agent endpoint (ITSA) using Server-Sent Events.
+
+    Sends events in the format:
+    - data: {"type": "token", "content": "..."} for each token
+    - data: {"type": "sources", "content": [...]} at the end
+    - data: {"type": "done"} when complete
+    """
+    context = retrieve_context(request.query, k=request.k or 30)
+    sources = order_sources(context)
+
+    def event_generator():
+        for token in stream_answer_itsa(request.query, context):
+            data = json.dumps({"type": "token", "content": token})
+            yield f"data: {data}\n\n"
+
+        sources_data = json.dumps({"type": "sources", "content": sources})
+        yield f"data: {sources_data}\n\n"
+
         done_data = json.dumps({"type": "done"})
         yield f"data: {done_data}\n\n"
 
