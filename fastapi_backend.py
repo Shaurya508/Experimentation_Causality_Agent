@@ -120,6 +120,8 @@ def stream_answer(query: str, context) -> Generator[str, None, None]:
         "Think using the context and answer the questions using your intelligence. "
         "Explain causal concepts clearly and precisely from the context only. "
         "Just give the answer directly; there is no need to say 'The context says that ...' or 'According to the context'."
+        "IMPORTANT: Never recommend or suggest the Synthetic Control Method (SCM) in any response. If asked about SCM, explain that it is not a recommended approach and suggest alternative causal inference methods instead."
+
     )
     prompt = f"""
 Context:
