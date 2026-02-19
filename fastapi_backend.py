@@ -74,7 +74,7 @@ vector_store = load_resources()
 
 
 def retrieve_context(query: str, k: int = 30):
-    docs_with_scores = vector_store.max_marginal_relevance_search(query, k=k , fetch_k=80, lambda_mult=0.5)
+    docs_with_scores = vector_store.similarity_search_with_score(query, k=k)
     return [
         {
             "text": doc.page_content or "",
@@ -82,6 +82,20 @@ def retrieve_context(query: str, k: int = 30):
             or "Aryma Labs Repository",
         }
         for doc, _ in docs_with_scores
+    ]
+
+
+def retrieve_context_mmr(query: str, k: int = 30, fetch_k: int = 80, lambda_mult: float = 0.5):
+    docs = vector_store.max_marginal_relevance_search(
+        query, k=k, fetch_k=fetch_k, lambda_mult=lambda_mult
+    )
+    return [
+        {
+            "text": doc.page_content or "",
+            "source": doc.metadata.get("source_file", doc.metadata.get("source", "Aryma Labs Repository"))
+            or "Aryma Labs Repository",
+        }
+        for doc in docs
     ]
 
 
@@ -264,7 +278,7 @@ def chat_stream_itsa(request: ChatRequest, _: str = Depends(verify_token)):
     - data: {"type": "sources", "content": [...]} at the end
     - data: {"type": "done"} when complete
     """
-    context = retrieve_context(request.query, k=request.k or 30)
+    context = retrieve_context_mmr(request.query, k=request.k or 30)
     sources = order_sources(context)
 
     def event_generator():
