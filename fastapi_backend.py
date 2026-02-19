@@ -18,7 +18,8 @@ from langchain_community.vectorstores import FAISS
 load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-FAISS_INDEX_DIR = "faiss_index_merged_updated"
+FAISS_INDEX_DIR1 = "faiss_index_merged_updated"
+FAISS_INDEX_DIR2 = "faiss_index_experimentation_final"
 EMBEDDING_MODEL = "models/gemini-embedding-001"
 GENERATION_MODEL = "gemini-2.5-flash"
 CHATBOT_API_KEY = os.getenv("CHATBOT_API_KEY")
@@ -62,19 +63,24 @@ class ChatResponse(BaseModel):
 # ---------- RAG Core ----------
 def load_resources():
     embeddings = GoogleGenerativeAIEmbeddings(model=EMBEDDING_MODEL)
-    vector_store = FAISS.load_local(
-        FAISS_INDEX_DIR,
+    vector_store1 = FAISS.load_local(
+        FAISS_INDEX_DIR1,
         embeddings,
         allow_dangerous_deserialization=True,
     )
-    return vector_store
+    vector_store2 = FAISS.load_local(
+        FAISS_INDEX_DIR2,
+        embeddings,
+        allow_dangerous_deserialization=True,
+    )
+    return vector_store1, vector_store2
 
 
-vector_store = load_resources()
+vector_store1, vector_store2 = load_resources()
 
 
 def retrieve_context(query: str, k: int = 30):
-    docs_with_scores = vector_store.similarity_search_with_score(query, k=k)
+    docs_with_scores = vector_store1.similarity_search_with_score(query, k=k)
     return [
         {
             "text": doc.page_content or "",
@@ -86,7 +92,7 @@ def retrieve_context(query: str, k: int = 30):
 
 
 def retrieve_context_mmr(query: str, k: int = 30, fetch_k: int = 80, lambda_mult: float = 0.5):
-    docs = vector_store.max_marginal_relevance_search(
+    docs = vector_store2.max_marginal_relevance_search(
         query, k=k, fetch_k=fetch_k, lambda_mult=lambda_mult
     )
     return [
