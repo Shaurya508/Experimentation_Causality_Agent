@@ -74,7 +74,7 @@ vector_store = load_resources()
 
 
 def retrieve_context(query: str, k: int = 30):
-    docs_with_scores = vector_store.similarity_search_with_score(query, k=k)
+    docs_with_scores = vector_store.max_marginal_relevance_search(query, k=k , fetch_k=80, lambda_mult=0.5)
     return [
         {
             "text": doc.page_content or "",
